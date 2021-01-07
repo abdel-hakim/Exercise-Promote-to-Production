@@ -14,23 +14,23 @@ jobs:
             --parameter-overrides "NAME=bucket-${CIRCLE_WORKFLOW_ID:0:7}"
       - run: aws s3 sync . s3://"bucket-${CIRCLE_WORKFLOW_ID:0:7}"  --delete
 
-  # get_last_deployment_id:
-  #   docker:
-  #     - image: amazon/aws-cli
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         #need to know which pipeline ID was responsible for the last successful production release
-  #         #Save that ID to a file and persist the file to the workspace for other jobs to access.
-  #         command: |
-  #           aws cloudformation \
-  #           list-exports --query "Exports[?Name==\`PipelineID\`].Value" \
-  #           --no-paginate --output text >> ~/output.txt
-  #           cat ~/output.txt
-  #     - persist_to_workspace:
-  #         root: ~/
-  #         paths:
-  #           - output.txt
+  get_last_deployment_id:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+          #need to know which pipeline ID was responsible for the last successful production release
+          #Save that ID to a file and persist the file to the workspace for other jobs to access.
+          command: |
+            aws cloudformation \
+            list-exports --query "Exports[?Name==\`PipelineID\`].Value" \
+            --no-paginate --output text >> ~/output.txt
+            cat ~/output.txt
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - output.txt
   promote_to_production:
     docker:
       - image: amazon/aws-cli
@@ -43,37 +43,37 @@ jobs:
             --template-file cloudfront.yml \
             --stack-name cloudfront \
             --parameter-overrides PipelineID="${CIRCLE_WORKFLOW_ID:0:7}"
-  # clean_up_old_front_end:
-  #   docker:
-  #     - image: amazon/aws-cli
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         # that uses the pipeline ID to destroy the previous production version's S3 bucket and CloudFormation stack.
-  #         #To achieve this, you need to retrieve from the workspace the file where the previous Pipeline ID was stored.
-  #         #Once you have the Pipeline ID, use the following commands to clean up:
-  #         command: |
-  #           aws s3 rm "s3://${OldPipelineID}" --recursive
-  #           aws cloudformation delete-stack --stack-name "${PreviousPipelineID}"
-  #     - attach_workspace:
-  #         at: ~/
+  clean_up_old_front_end:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+          # that uses the pipeline ID to destroy the previous production version's S3 bucket and CloudFormation stack.
+          #To achieve this, you need to retrieve from the workspace the file where the previous Pipeline ID was stored.
+          #Once you have the Pipeline ID, use the following commands to clean up:
+          command: |
+            aws s3 rm "s3://${OldPipelineID}" --recursive
+            aws cloudformation delete-stack --stack-name "${PreviousPipelineID}"
+      - attach_workspace:
+          at: ~/
+workflows:
+  myworkflow:
+    jobs:
+      - create_and_deploy_front_end
+      - get_last_deployment_id:
+          requires:
+            - create_and_deploy_front_end
+      - promote_to_production:
+          requires:
+            - create_and_deploy_front_end
+      - clean_up_old_front_end:
+          requires:
+            - get_last_deployment_id
 # workflows:
-#   myworkflow:
+#   default:
 #     jobs:
 #       - create_and_deploy_front_end
-#       - get_last_deployment_id:
-#           requires:
-#             - create_and_deploy_front_end
 #       - promote_to_production:
 #           requires:
 #             - create_and_deploy_front_end
-#       - clean_up_old_front_end:
-#           requires:
-#             - get_last_deployment_id
-workflows:
-  default:
-    jobs:
-      - create_and_deploy_front_end
-      - promote_to_production:
-          requires: 
-            - create_and_deploy_front_end
