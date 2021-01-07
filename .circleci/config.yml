@@ -71,9 +71,9 @@ jobs:
 #           requires:
 #             - get_last_deployment_id
 workflows:
-    default:
-      jobs:
-        - create_and_deploy_front_end
-        - promote_to_production
-            requires: 
-              - "create_and_deploy_front_end"
+  default:
+    jobs:
+      - create_and_deploy_front_end
+      - promote_to_production
+          requires: 
+            - create_and_deploy_front_end
