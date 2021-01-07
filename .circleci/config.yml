@@ -20,6 +20,10 @@ jobs:
     steps:
       - checkout
       - run:
+          command: |
+            yum install tar -y
+            yum install gzip -y
+      - run:
           #need to know which pipeline ID was responsible for the last successful production release
           #Save that ID to a file and persist the file to the workspace for other jobs to access.
           command: |
@@ -42,19 +46,23 @@ jobs:
             aws cloudformation deploy \
             --template-file cloudfront.yml \
             --stack-name cloudfront \
-            --parameter-overrides PipelineID="${CIRCLE_WORKFLOW_ID:0:7}"
+            --parameter-overrides PipelineID="${CIRCLE_WORKFLOW_ID}"
   clean_up_old_front_end:
     docker:
       - image: amazon/aws-cli
     steps:
       - checkout
       - run:
+          command: |
+            yum install tar -y
+            yum install gzip -y
+
           # that uses the pipeline ID to destroy the previous production version's S3 bucket and CloudFormation stack.
           #To achieve this, you need to retrieve from the workspace the file where the previous Pipeline ID was stored.
           #Once you have the Pipeline ID, use the following commands to clean up:
-          command: |
-            aws s3 rm "s3://${OldPipelineID}" --recursive
-            aws cloudformation delete-stack --stack-name "${PreviousPipelineID}"
+      - run: |
+          aws s3 rb "s3://bucket-${CIRCLE_WORKFLOW_ID:0:7}" --force
+          aws cloudformation delete-stack --stack-name "bucket-${CIRCLE_WORKFLOW_ID:0:7}" 
       - attach_workspace:
           at: ~/
 workflows:
